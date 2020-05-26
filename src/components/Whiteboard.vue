@@ -2,7 +2,7 @@
     <div class="whiteboard">
         <canvas class="canv" :class="{'whiteboard__active': master}" :id="canvasId" width="400" height="400"
                 @drop="onDrop"
-                @dragover.prevent></canvas>
+                @dragover="allowDrop"></canvas>
     </div>
 </template>
 
@@ -12,6 +12,13 @@
         x > obj.x + obj.width ||
         y < obj.y ||
         y > obj.y + obj.height);
+  };
+
+  const isOnCorner = (x, y, obj) => {
+    return !(x < obj.x + obj.width - 10 ||
+        x > obj.x + obj.width + 10 ||
+        y < obj.y + obj.height - 10 ||
+        y > obj.y + obj.height + 10);
   };
 
   const randomizeId = () => {
@@ -46,7 +53,7 @@
         canvasId: randomizeId(),
         context: null,
         canvas: null,
-        object: null
+        object: null,
       };
     },
 
@@ -66,6 +73,11 @@
     },
 
     methods: {
+      allowDrop(e) {
+        e.preventDefault();
+        this.delay = false;
+      },
+
       throwOutside() {
         const ctx = Object.assign({}, this.object);
         this.$emit('ctx', ctx);
@@ -77,6 +89,7 @@
           } else {
             requestAnimationFrame(draw);
           }
+
 
           this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -90,7 +103,32 @@
               if (isPointInRange(downX, downY, this.object)) {
                 startMove(downX, downY);
               }
+
+              if (isOnCorner(downX, downY, this.object)) {
+                startResize(downX, downY);
+              }
             }
+          };
+
+
+          const startResize = (downX, downY) => {
+            // const origX = this.object.x;
+            // const origY = this.object.y;
+
+            this.canvas.onmousemove = (e) => {
+              const moveX = e.offsetX;
+              const moveY = e.offsetY;
+              const diffX = moveX - downX;
+              const diffY = moveY - downY;
+
+              this.object.width = downX + diffX;
+              this.object.height = downY + diffY;
+            };
+
+            this.canvas.onmouseup = () => {
+              this.canvas.onmousemove = function () {
+              };
+            };
           };
 
           const startMove = (downX, downY) => {
@@ -118,20 +156,17 @@
       },
 
       drawImage() {
-        // let a;
-        // if (this.master) {
-        //   a = Object.assign({}, this.object);
-        // } else {
-        //   a = Object.assign({}, this.outerContext);
-        // }
         this.context.drawImage(this.image, this.imageContext.x, this.imageContext.y, this.imageContext.width, this.imageContext.height);
+        this.context.beginPath();
+        this.context.arc(this.imageContext.x + this.imageContext.width, this.imageContext.y + this.imageContext.height, 5, 0, Math.PI * 2, false);
+        this.context.closePath();
+        this.context.fill();
         this.throwOutside();
       },
 
       setAsMaster() {
         this.master = true;
         this.$emit('master', this.canvasId);
-        console.log('setAsMaster', this.canvasId);
       },
 
       onDrop(e) {
@@ -158,6 +193,7 @@
         };
 
         this.drawImage();
+
         this.setAsMaster();
       },
     }
